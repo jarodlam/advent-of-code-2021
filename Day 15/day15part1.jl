@@ -1,3 +1,5 @@
+using Plots
+
 const filename = "inputex.txt"
 
 function parseinput(fn::String)
@@ -27,30 +29,96 @@ function getedges(map, i::CartesianIndex)
     return edgesi
 end
 
-function distancetransform(map::Matrix{<:Int}, target::CartesianIndex)
-    dtrans = Array{Union{Int, Missing}}(undef, size(map))
-    fill!(dtrans, missing)
-    dtrans[target] = map[target]
-    display(dtrans)
+function cost(a::CartesianIndex, b::CartesianIndex)
+    d = (a - b).I
+    return sqrt(d[1] ^ 2 + d[2] ^ 2)
+end
+
+function insertsorted!(v::Vector, x, costs::Matrix)
+    # https://stackoverflow.com/a/25688266
+    splice!(v, searchsorted(v, x, by=x->costs[x]), [x])
+    return v
+end
+
+function astar(m::Matrix{<:Number}, start::CartesianIndex, goal::CartesianIndex)
+    parent = Dict{CartesianIndex, CartesianIndex}()    # node => parentnode
+    frontier = CartesianIndex[]
+    explored = CartesianIndex[]
+    g = zeros(Float64, size(m))
+    h = zeros(Float64, size(m))
     
-    while true
-        for i in CartesianIndices(dtrans)
-            edgesi = getedges(dtrans, i)
-            if isempty(edgesi)
-                continue
-            end
+    # Initialise start node
+    g[start] = 0
+    h[start] = cost(start, goal)
+    push!(frontier, start)
+    #g = Vector{CartesianIndex, Int}(start => 0)
+    #h = Dict{CartesianIndex, Int}(start => cost(start, goal))
 
-            dtrans[i] = minimum(dtrans[edgesi] .+ map[i])
+    while !isempty(frontier)
+        node = pop!(frontier)
 
+        println("Expanding node at $(node.I)")
+
+        # Are we there yet?
+        if node == goal
+            break
         end
-        display(dtrans)
-        println()
+
+        # Check each neighbour
+        neighbours = getedges(m, node)
+        for nb in neighbours
+
+            # Not in frontier and not explored, so add to frontier
+            if !(nb in frontier) && !(nb in explored)
+                g[nb] = g[node] + m[nb]
+                h[nb] = cost(nb, goal)
+                insertsorted!(frontier, nb, g .+ h)
+                parent[nb] = node
+                println("    Adding node $(nb.I) to frontier. g=$(g[nb]), h=$(h[nb])")
+            
+            # In frontier, so check if this is a shorter path
+            elseif nb in frontier
+                gnew = g[node] + m[nb]
+                if gnew < g[node]
+                    # Reparent node
+                    g[node] = gnew
+                    parent[nb] = node
+                    println("    Reparenting node $(nb.I). g=$(g[nb]), h=$(h[nb])")
+                end
+            end
+        end
+
+        # Node is now explored
+        push!(explored, node)
     end
+
+    display(heatmap(g))
+    
+    # Reconstruct path
+    path = CartesianIndex[]
+    risk = m[goal]
+    n = goal
+    while true
+        pushfirst!(path, n)
+        if n == start
+            break
+        end
+        n = parent[n]
+        #println("$risk: $(n.I)")
+        risk += m[n]
+    end
+    return (path, risk)
+end
+
+function dijkstra(m::Matrix{<:Number}, start::CartesianIndex, goal::CartesianIndex)
+    explored = zeros(size(m))
+    
 end
 
 function part1(map::Matrix{<:Number})
-    target = CartesianIndex(size(map)) # bottom-right
-    return distancetransform(map, target)
+    start = CartesianIndex(1, 1)
+    goal = CartesianIndex(size(map))
+    return astar(map, start, goal)
 end
 
 println(part1(parseinput(filename)))
