@@ -1,4 +1,4 @@
-using Plots
+using Profile
 
 const filename = "inputex.txt"
 
@@ -36,8 +36,12 @@ end
 
 function insertsorted!(v::Vector, x, costs::Matrix)
     # https://stackoverflow.com/a/25688266
-    splice!(v, searchsorted(v, x, by=x->costs[x]), [x])
-    return v
+    idx = searchsorted(v, x, by=x->costs[x])
+    if first(idx) == last(idx)
+        idx = first(idx):last(idx)-1
+    end
+    splice!(v, idx, [x])
+    #println("    Frontier: $(map(x->x.I, v))")
 end
 
 function astar(m::Matrix{<:Number}, start::CartesianIndex, goal::CartesianIndex)
@@ -51,13 +55,11 @@ function astar(m::Matrix{<:Number}, start::CartesianIndex, goal::CartesianIndex)
     g[start] = 0
     h[start] = cost(start, goal)
     push!(frontier, start)
-    #g = Vector{CartesianIndex, Int}(start => 0)
-    #h = Dict{CartesianIndex, Int}(start => cost(start, goal))
 
     while !isempty(frontier)
-        node = pop!(frontier)
+        node = popfirst!(frontier)
 
-        println("Expanding node at $(node.I)")
+        #println("Expanding node at $(node.I). risk=$(m[node])")
 
         # Are we there yet?
         if node == goal
@@ -74,7 +76,7 @@ function astar(m::Matrix{<:Number}, start::CartesianIndex, goal::CartesianIndex)
                 h[nb] = cost(nb, goal)
                 insertsorted!(frontier, nb, g .+ h)
                 parent[nb] = node
-                println("    Adding node $(nb.I) to frontier. g=$(g[nb]), h=$(h[nb])")
+                #println("    Adding node $(nb.I) to frontier. g=$(g[nb]), h=$(h[nb])")
             
             # In frontier, so check if this is a shorter path
             elseif nb in frontier
@@ -83,7 +85,7 @@ function astar(m::Matrix{<:Number}, start::CartesianIndex, goal::CartesianIndex)
                     # Reparent node
                     g[node] = gnew
                     parent[nb] = node
-                    println("    Reparenting node $(nb.I). g=$(g[nb]), h=$(h[nb])")
+                    #println("    Reparenting node $(nb.I). g=$(g[nb]), h=$(h[nb])")
                 end
             end
         end
@@ -92,11 +94,11 @@ function astar(m::Matrix{<:Number}, start::CartesianIndex, goal::CartesianIndex)
         push!(explored, node)
     end
 
-    display(heatmap(g))
+    #display(heatmap(g))
     
     # Reconstruct path
     path = CartesianIndex[]
-    risk = m[goal]
+    risk = m[goal] - m[start]    # ignore start risk
     n = goal
     while true
         pushfirst!(path, n)
@@ -107,18 +109,36 @@ function astar(m::Matrix{<:Number}, start::CartesianIndex, goal::CartesianIndex)
         #println("$risk: $(n.I)")
         risk += m[n]
     end
+    #println(path)
     return (path, risk)
-end
-
-function dijkstra(m::Matrix{<:Number}, start::CartesianIndex, goal::CartesianIndex)
-    explored = zeros(size(m))
-    
 end
 
 function part1(map::Matrix{<:Number})
     start = CartesianIndex(1, 1)
     goal = CartesianIndex(size(map))
-    return astar(map, start, goal)
+    return astar(map, start, goal)[2]
 end
 
+function part2(map::Matrix{<:Number})
+    map2 = repeat(map, 5, 5)
+    offset = [
+        0 1 2 3 4;
+        1 2 3 4 5;
+        2 3 4 5 6;
+        3 4 5 6 7;
+        4 5 6 7 8
+    ]
+    map2 += repeat(offset, inner=size(map))
+    map2 .%= 9
+    map2[map2 .== 0] .= 9
+
+    start = CartesianIndex(1, 1)
+    goal = CartesianIndex(size(map2))
+    return astar(map2, start, goal)[2]
+end
+
+@profile (maximum(rand(100,100)))
+Profile.print(format=:flat, sortedby=:count)
+
 println(part1(parseinput(filename)))
+println(part2(parseinput(filename)))
