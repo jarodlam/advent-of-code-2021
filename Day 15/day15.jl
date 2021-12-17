@@ -1,6 +1,6 @@
 using DataStructures
 
-const filename = "inputex.txt"
+const filename = "input.txt"
 
 function parseinput(fn::String)
     map = Int[]
@@ -25,23 +25,13 @@ function getedges(map, i::CartesianIndex)
         i + CartesianIndex(0, -1)
     ]
     filter!(x -> checkbounds(Bool, map, x.I...), edgesi)
-    filter!(x -> !ismissing(map[x]), edgesi)
     return edgesi
 end
 
 function cost(a::CartesianIndex, b::CartesianIndex)
     d = (a - b).I
-    return sqrt(d[1] ^ 2 + d[2] ^ 2) 
-end
-
-function insertsorted!(v::Vector, x, costs::Matrix)
-    # https://stackoverflow.com/a/25688266
-    idx = searchsorted(v, x, by=x->costs[x])
-    if first(idx) == last(idx)
-        idx = first(idx):last(idx)-1
-    end
-    splice!(v, idx, [x])
-    #println("    Frontier: $(map(x->x.I, v))")
+    #return sqrt(d[1] ^ 2 + d[2] ^ 2)
+    return sum(d)
 end
 
 function astar(m::Matrix{<:Number}, start::CartesianIndex, goal::CartesianIndex)
@@ -99,28 +89,14 @@ function astar(m::Matrix{<:Number}, start::CartesianIndex, goal::CartesianIndex)
         print("$progress%\r")
     end
     println()
-
-    # Reconstruct path
-    path = CartesianIndex[]
-    risk = m[goal] - m[start]    # ignore start risk
-    n = goal
-    while true
-        pushfirst!(path, n)
-        if n == start
-            break
-        end
-        n = parent[n]
-        #println("$risk: $(n.I)")
-        risk += m[n]
-    end
     
-    return (path, risk)
+    return Int(g[goal])
 end
 
 function part1(map::Matrix{<:Number})
     start = CartesianIndex(1, 1)
     goal = CartesianIndex(size(map))
-    return astar(map, start, goal)[2]
+    return astar(map, start, goal)
 end
 
 function part2(map::Matrix{<:Number})
@@ -138,7 +114,8 @@ function part2(map::Matrix{<:Number})
 
     start = CartesianIndex(1, 1)
     goal = CartesianIndex(size(map2))
-    return astar(map2, start, goal)[2]
+    return astar(map2, start, goal)
+    #return solve(map2)
 end
 
 println(part1(parseinput(filename)))
