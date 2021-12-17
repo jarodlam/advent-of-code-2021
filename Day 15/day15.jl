@@ -1,4 +1,4 @@
-using Profile
+using DataStructures
 
 const filename = "inputex.txt"
 
@@ -31,7 +31,7 @@ end
 
 function cost(a::CartesianIndex, b::CartesianIndex)
     d = (a - b).I
-    return sqrt(d[1] ^ 2 + d[2] ^ 2)
+    return sqrt(d[1] ^ 2 + d[2] ^ 2) 
 end
 
 function insertsorted!(v::Vector, x, costs::Matrix)
@@ -46,18 +46,18 @@ end
 
 function astar(m::Matrix{<:Number}, start::CartesianIndex, goal::CartesianIndex)
     parent = Dict{CartesianIndex, CartesianIndex}()    # node => parentnode
-    frontier = CartesianIndex[]
-    explored = CartesianIndex[]
-    g = zeros(Float64, size(m))
-    h = zeros(Float64, size(m))
+    frontier = PriorityQueue{CartesianIndex, Float64}()
+    explored = Set{CartesianIndex}()
+    g = Dict{CartesianIndex, Float64}()
+    h = Dict{CartesianIndex, Float64}()
     
     # Initialise start node
     g[start] = 0
     h[start] = cost(start, goal)
-    push!(frontier, start)
+    enqueue!(frontier, start, g[start] + h[start])
 
     while !isempty(frontier)
-        node = popfirst!(frontier)
+        node = dequeue!(frontier)
 
         #println("Expanding node at $(node.I). risk=$(m[node])")
 
@@ -71,20 +71,21 @@ function astar(m::Matrix{<:Number}, start::CartesianIndex, goal::CartesianIndex)
         for nb in neighbours
 
             # Not in frontier and not explored, so add to frontier
-            if !(nb in frontier) && !(nb in explored)
+            if !(nb in keys(frontier)) && !(nb in explored)
                 g[nb] = g[node] + m[nb]
                 h[nb] = cost(nb, goal)
-                insertsorted!(frontier, nb, g .+ h)
+                enqueue!(frontier, nb, g[nb] + h[nb])
                 parent[nb] = node
                 #println("    Adding node $(nb.I) to frontier. g=$(g[nb]), h=$(h[nb])")
             
             # In frontier, so check if this is a shorter path
-            elseif nb in frontier
+            elseif nb in keys(frontier)
                 gnew = g[node] + m[nb]
                 if gnew < g[node]
                     # Reparent node
                     g[node] = gnew
                     parent[nb] = node
+                    frontier[nb] = g[nb] + h[nb]
                     #println("    Reparenting node $(nb.I). g=$(g[nb]), h=$(h[nb])")
                 end
             end
@@ -92,10 +93,13 @@ function astar(m::Matrix{<:Number}, start::CartesianIndex, goal::CartesianIndex)
 
         # Node is now explored
         push!(explored, node)
-    end
 
-    #display(heatmap(g))
-    
+        # Progress bar
+        progress = round(length(explored) / length(m) * 100, digits=1)
+        print("$progress%\r")
+    end
+    println()
+
     # Reconstruct path
     path = CartesianIndex[]
     risk = m[goal] - m[start]    # ignore start risk
@@ -109,7 +113,7 @@ function astar(m::Matrix{<:Number}, start::CartesianIndex, goal::CartesianIndex)
         #println("$risk: $(n.I)")
         risk += m[n]
     end
-    #println(path)
+    
     return (path, risk)
 end
 
@@ -136,9 +140,6 @@ function part2(map::Matrix{<:Number})
     goal = CartesianIndex(size(map2))
     return astar(map2, start, goal)[2]
 end
-
-@profile (maximum(rand(100,100)))
-Profile.print(format=:flat, sortedby=:count)
 
 println(part1(parseinput(filename)))
 println(part2(parseinput(filename)))
